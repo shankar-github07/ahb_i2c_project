@@ -19,11 +19,11 @@ module i2c_master_fsm (
     typedef enum logic [2:0] {IDLE, START, ADDR, DATA, STOP} state_t;
     state_t state;
     
+    assign scl = clk; 
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state <= IDLE;
-            scl <= 1'b1; 
             sda_out <= 1'b1;
             sda_oe <= 1'b0;
             busy <= 0;

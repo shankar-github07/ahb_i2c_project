@@ -165,7 +165,6 @@ class ahb_drv extends uvm_driver #(ahb_txn);
     task write_d();
     begin
    	  @(posedge vif.HCLK);
-   	  //vif.HRESETn <= 1'b1; 
       vif.HSEL   <= 1'b1;
       vif.HTRANS <= 2'b10;
       vif.HWRITE <= 1'b1;
@@ -232,46 +231,50 @@ class ahb_mon extends uvm_monitor;
       tr.HWRITE = vif.HWRITE;
       tr.HRDATA = vif.HRDATA;
       ap_ahb.write(tr);
+       `uvm_info("AHB_MON",$sformatf(" HADDR : %0h  HWDATA : %0h HWRITE :%0h",tr.HADDR,tr.HWDATA,tr.HWRITE),	 UVM_NONE);
       end   
     end
   endtask
 endclass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-class i2c_slave_bfm extends uvm_component;
+class i2c_mon extends uvm_component;
+
   virtual i2c_if aif;
   bit [6:0] slave_addr = 7'h50;
   bit [7:0] mem = 8'hA5;
   bit sda_out, sda_oe;
 
-  `uvm_component_utils(i2c_slave_bfm)
+  `uvm_component_utils(i2c_mon)
+   uvm_analysis_port#(ahb_txn) ap_i2c;
   
-  function new(input string path = "i2c_slave_bfm", uvm_component parent = null);
+  function new(input string path = "i2c_mon", uvm_component parent = null);
     super.new(path,parent);
   endfunction 
 
   function void build_phase(uvm_phase phase);
   super.build_phase(phase);
+   ap_i2c = new("ap_i2c", this);
     if (!uvm_config_db#(virtual i2c_if)::get(this,"","aif",aif))
-      `uvm_fatal("NOVIF","I2C IF not found")
+      `uvm_fatal("NO VIF","I2C IF not found")
   endfunction
-
-  always_comb begin
-  if (sda_oe)
-    aif.sda = sda_out;
-  else 
-    aif.sda = 1'bz;
-  end
 
   task run_phase(uvm_phase phase);
     bit [7:0] rx;
     forever begin
       @(negedge aif.sda iff aif.scl);
       recv(rx);
-      if (rx[7:1] == slave_addr) ack();
-      if (rx[0]==0) begin recv(rx); mem=rx; ack(); end
-      else begin send(mem); recv(rx); end
+      if (rx[7:1] == slave_addr)begin 
+      if (rx[0]==0)begin 
+      recv(rx); 
+      mem=rx;
+      end
+      else begin 
+      send(mem); 
+      recv(rx); 
+      end
     end
+    end 
   endtask
 
   task recv(output bit [7:0] d);
@@ -280,14 +283,7 @@ class i2c_slave_bfm extends uvm_component;
     d[i]=aif.sda; 
     end
   endtask
-  
-  task ack(); 
-  @(negedge aif.scl); 
-  sda_out=0; sda_oe=1; 
-  @(posedge aif.scl); 
-  sda_oe=0; 
-  endtask
-  
+
   task send(input bit [7:0] d);
     for (int i=7;i>=0;i--) 
     begin 
@@ -298,46 +294,7 @@ class i2c_slave_bfm extends uvm_component;
     sda_oe=0;
   endtask
   
-endclass
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-class i2c_mon extends uvm_monitor;
-  `uvm_component_utils(i2c_mon)
-  
-  ahb_txn tr;
-  virtual i2c_if aif;
-  uvm_analysis_port#(ahb_txn)ap_i2c;
-  	
-  
-  function new (string path = "i2c_mon", uvm_component parent = null);
-    super.new(path,parent); 
-  endfunction 
-
-  virtual function void build_phase(uvm_phase phase);
-    super.build_phase(phase);
-    ap_i2c = new("ap_i2c", this);
-    if (!uvm_config_db#(virtual i2c_if)::get(this,"","aif",aif))
-      `uvm_error("I2C_MON","Unable to access I2C IF");
-  endfunction
-
-  task run_phase(uvm_phase phase);
-    forever begin
-      tr = ahb_txn::type_id::create("tr");
-      tr.addr = tb_top.dut.u_i2c.
-
-	  
-  
-         `uvm_info("I2C_MON ",$sformatf(" addr : %0h  wdata : %0h wr :%0h",tr.addr,tr.wdata,tr.write),	 UVM_NONE);
-     
-            `uvm_info("I2C_MON ",$sformatf(" addr : %0h  wdata : %0h wr :%0h",tr.addr,tr.wdata,tr.write),	 UVM_NONE);
-      end
-      ap_i2c.write(tr);
-    end
-    end 
-  endtask
-  
-endclass
-
+endclass 
 
 /////////////////////////////////////////////////////////////////////
 `uvm_analysis_imp_decl(_exp)
